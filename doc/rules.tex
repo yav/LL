@@ -1,0 +1,147 @@
+\documentclass{article}
+\usepackage {mathpartir}
+\usepackage {amssymb}
+
+\newcommand{\from}{\leftarrow}
+\newcommand{\arr}{\rightarrow}
+\newcommand{\kw}[1]{\mathtt{#1}}
+\newcommand{\cc}{~::~}
+\newcommand{\fun}{\star}
+
+\newcommand{\eCase}[2]{\kw{case}~{#1}~\kw{of}~\{~{#2}~\}}
+\newcommand{\eLetCase}[3]{\kw{case}~{#1}~\kw{of}~{#2}~\{~{#3}~\}}
+\newcommand{\eLam}[2]{\lambda{#1}.~{#2}}
+\newcommand{\eLet}[3]{\kw{let}~\{~{#1}={#2}~\}~\kw{in}~{#3}}
+\newcommand{\eCut}[4]{\{ {#1} \from {#2}~|~{#3} \to {#4} \}}
+
+
+\newcommand{\ju}[2]{\mathtt{#1} \cc {#2}}
+\newcommand{\fits}[2]{{#1}\leftrightarrow{#2}}
+\newcommand{\nofit}[2]{{#1}\nleftrightarrow{#2}}
+\newcommand{\op}[1]{{#1}^\star}
+\newcommand{\ty}[2]{\mathtt{#1}:{#2}}
+
+\title{MALL}
+
+\begin{document}
+
+\section{Syntax}
+
+\begin{mathpar}
+t := s~|~\op s \\
+s := a~|~()~|~(t,t)~|~0~|~(t+t) \\
+\end{mathpar}
+
+\section{No Proof Terms}
+
+\begin{mathpar}
+
+\infer
+  {\fits a x}
+  {a,x}
+
+\infer
+  {\fits a x}
+  {a,x+p}
+
+\infer
+  {\fits a x}
+  {a,p+x}
+
+\infer
+  { }
+  {()}
+
+\infer
+  {\fits a x \\ \fits b y}
+  {a,b,(x,y)}
+
+\infer
+  { }
+  {\Gamma,\op 0}
+
+
+\infer
+  {\Gamma,a \\ \Delta,x \\ \fits a x}
+  {\Gamma,\Delta}
+
+\infer
+  {\Gamma,x \\ \Gamma,y \\ \fits a x \\ \fits b y}
+  {\Gamma,\op{(a+b)}}
+
+\infer
+  {\Gamma}
+  {\Gamma,\op{()}}
+
+\infer
+  {\Gamma,x,y \\ \fits a x \\ \fits b y}
+  {\Gamma,\op{(a,b)}}
+
+\\
+
+\infer
+  { }
+  {\fits a {\op a}}
+
+\infer
+  { }
+  {\fits {\op a} a}
+\end{mathpar}
+
+
+
+\section{With Proof Terms}
+
+The typing rules for an expression $e$ are of the form:
+$$
+\ju e \Gamma
+$$
+
+\begin{mathpar}
+
+\infer
+  {\fits a x}
+  {\ju {u = v} {u:a, v:x}}
+
+\infer
+  {\fits a x}
+  {\ju {u = L~v} {u:a+p, v:x}}
+
+\infer
+  {\fits a x}
+  {\ju {u = R~v} {u:p+a, v:x}}
+
+\infer
+  { }
+  {\ju {u = ()} {u:()}}
+
+\infer
+  {\fits a x \\ \fits b y}
+  {\ju {u = (v,w)} {u:(x,y),v:a,w:b}}
+
+\infer
+  { }
+  {\ju {u = \{ v_i \}} {u : \op 0, v_i:x_i}}
+
+
+\infer
+  {\ju {e1} {u:a,\Gamma} \\ \ju{e2} {v:x,\Delta} \\ \fits a x}
+  {\ju{ \{ u \to e_1; v \to e_2 \}} {\Gamma,\Delta}}
+
+\infer
+  {\ju {e1} {v:x,\Gamma} \\ \ju {e2} {w:y,\Gamma} \\ \fits a x \\ \fits b y}
+  {\ju {u = ~\{L~v \to e1; R~w \to~e2\}} {u:\op{(a+b)},\Gamma}}
+
+\infer
+  {\ju e {\Gamma}}
+  {\ju {u = \{ () \to e \} } {u : \op{()}, \Gamma}}
+
+\infer
+  {\ju e {v:x,w:y,\Gamma} \\ \fits a x \\ \fits b y}
+  {\ju {u = \{ (v,w) \to e \}} {u:\op{(a,b)},\Gamma}}
+
+\end{mathpar}
+
+
+\end{document}
+
