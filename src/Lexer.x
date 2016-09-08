@@ -3,6 +3,7 @@
 module Lexer where
 
 import AlexTools
+import Data.Text(Text)
 }
 
 $upper      = [A-Z]
@@ -18,11 +19,13 @@ tokens :-
   ")"                 { lexeme KW_close_paren }
   ";"                 { lexeme KW_semi }
   ":"                 { lexeme KW_colon }
-  ","                 { lexeme KW_comma }
   "data"              { lexeme KW_data }
+  "|"                 { lexeme KW_bar }
+  "^"                 { lexeme KW_hat }
 
-  $upper $ident_next* { lexeme VAR }
-  $lower $ident_next* { lexeme CON }
+  $upper $ident_next* { lexeme CON }
+  $lower $ident_next* { lexeme VAR }
+  "$" $ident_next*    { lexeme EVAR }
 
   "--" .*             { return [] }
   $white+             { return [] }
@@ -33,8 +36,8 @@ tokens :-
 alexGetByte :: AlexInput -> Maybe (Word8,AlexInput)
 alexGetByte = makeAlexGetByte $ \c -> fromIntegral (min 127 (fromEnum c))
 
-lexer :: Input -> [Lexeme Token]
-lexer = $makeLexer simpleLexer
+lexer :: Text -> [Lexeme Token]
+lexer txt = $makeLexer simpleLexer (initialInput txt)
 
 data Token =
     KW_eq
@@ -45,11 +48,13 @@ data Token =
   | KW_close_paren
   | KW_semi
   | KW_colon
-  | KW_comma
   | KW_data
+  | KW_bar
+  | KW_hat
 
   | VAR
   | CON
+  | EVAR
 
   | BAD
 }
