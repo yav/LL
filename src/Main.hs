@@ -6,6 +6,7 @@ import qualified Data.Text.IO as Text
 
 import Lexer
 import Parser
+import Check
 
 
 main :: IO ()

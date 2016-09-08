@@ -94,6 +94,58 @@ inferTypedName tn =
                     return (name tn, t)
 
 
+-- XXX: Does not check for duplicates
+checkDecl :: Decl -> InferM Data
+checkDecl (DData c xs cons) =
+  do setKnownLimit xs
+     ts <- mapM checkTVar xs
+     let vs = [ x | TVar x <- ts ]
+     cs <- mapM checkDCon cons
+     return (CheckedData c vs cs)
+
+checkDCon :: DataCon -> InferM (Name,[Type])
+checkDCon (DataCon c ts') =
+  do ts <- mapM checkType ts'
+     return (c,ts)
+
+
+checkType :: S.Type -> InferM Type
+checkType ty =
+  case ty of
+    S.TNot t' ->
+      do t <- checkType t'
+         case t of
+           TNot a -> return a
+           _      -> return (TNot t)
+
+    S.TCon c ts' ->
+      do ts <- mapM checkType ts'
+         (ty',_) <- lookupData c
+         unify ty' (TCon c ts)
+         return ty'
+
+    S.TVar x ->
+      do mb <- IM $ \_ rw -> Right (Map.lookup x (knownVars rw), rw)
+         case mb of
+           Nothing ->
+             do t <- newTVar
+                IM $ \_ rw -> Right (t, rw { knownVars =
+                                              Map.insert x t (knownVars rw) })
+           Just t -> return t
+
+checkTVar :: Name -> InferM Type
+checkTVar x =
+  do mb <- lookupKnown x
+     case mb of
+       Just t -> return t
+       Nothing ->
+         do flex <- flexibleKnown x
+            unless flex $ reportError "Unknown parameter"
+            t <- newTVar
+            addKnown x t
+            return t
+
+
 --------------------------------------------------------------------------------
 newtype InferM a = IM (RO -> RW -> Either TypeError (a,RW))
 
@@ -103,6 +155,7 @@ data RW = RW
   { nextVar   :: !Int
   , subst     :: !Subst
   , knownVars :: !(Map Name Type)
+  , limitVars :: Maybe [Name]
   }
 
 data Data   = CheckedData Name [TVar] [ (Name, [Type]) ]
@@ -128,6 +181,28 @@ instance Monad InferM where
                                Right (a,rw1) -> let IM m1 = f a
                                              in m1 ro rw1)
 
+lookupKnown :: Name -> InferM (Maybe Type)
+lookupKnown x = IM $ \_ rw -> Right (Map.lookup x (knownVars rw), rw)
+
+addKnown :: Name -> Type -> InferM ()
+addKnown x t = IM $ \_ rw ->
+  Right ((), rw { knownVars = Map.insert x t (knownVars rw) })
+
+setNoKnownLimit :: InferM ()
+setNoKnownLimit = IM $ \_ rw -> Right ((), rw { limitVars = Nothing
+                                              , knownVars = Map.empty })
+
+setKnownLimit :: [Name] -> InferM ()
+setKnownLimit xs = IM $ \_ rw -> Right ((), rw { limitVars = Just xs
+                                               , knownVars = Map.empty })
+
+flexibleKnown :: Name -> InferM Bool
+flexibleKnown x = IM $ \_ rw ->
+  case limitVars rw of
+    Nothing -> Right (True, rw)
+    Just xs -> Right (x `elem` xs, rw)
+
+
 reportError :: TypeError -> InferM a
 reportError err = IM (\_ _ -> Left err)
 
@@ -137,30 +212,6 @@ newTVar = IM $ \_ rw ->
       n1 = n + 1
       x  = TV n Nothing
   in x `seq` n1 `seq` Right (TVar x, rw { nextVar = n + 1 })
-
-checkType :: S.Type -> InferM Type
-checkType ty =
-  case ty of
-    S.TNot t' ->
-      do t <- checkType t'
-         case t of
-           TNot a -> return a
-           _      -> return (TNot t)
-
-    S.TCon c ts' ->
-      do ts <- mapM checkType ts'
-         (ty',_) <- lookupData c
-         unify ty' (TCon c ts)
-         return ty'
-
-    S.TVar x ->
-      do mb <- IM $ \_ rw -> Right (Map.lookup x (knownVars rw), rw)
-         case mb of
-           Nothing ->
-             do t <- newTVar
-                IM $ \_ rw -> Right (t, rw { knownVars =
-                                              Map.insert x t (knownVars rw) })
-           Just t -> return t
 
 unify :: Type -> Type -> InferM ()
 unify t1' t2' =
